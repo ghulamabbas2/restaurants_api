@@ -7,7 +7,10 @@ import {
   Post,
   Put,
   Query,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 import { Query as ExpressQuery } from 'express-serve-static-core';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto';
@@ -57,14 +60,34 @@ export class RestaurantsController {
     @Param('id')
     id: string,
   ): Promise<{ deleted: Boolean }> {
-    await this.restaurantsService.findById(id);
+    const restaurant = await this.restaurantsService.findById(id);
 
-    const restaurant = this.restaurantsService.deleteById(id);
+    const isDeleted = await this.restaurantsService.deleteImages(
+      restaurant.images,
+    );
 
-    if (restaurant) {
+    if (isDeleted) {
+      this.restaurantsService.deleteById(id);
+
       return {
         deleted: true,
       };
+    } else {
+      return {
+        deleted: false,
+      };
     }
+  }
+
+  @Put('upload/:id')
+  @UseInterceptors(FilesInterceptor('files'))
+  async uploadFiles(
+    @Param('id') id: string,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+  ) {
+    await this.restaurantsService.findById(id);
+
+    const res = await this.restaurantsService.uploadImages(id, files);
+    return res;
   }
 }
